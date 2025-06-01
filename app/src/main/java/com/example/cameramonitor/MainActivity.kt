@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.text.method.ScrollingMovementMethod
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -41,6 +42,9 @@ class MainActivity : AppCompatActivity() {
         btnStart = findViewById(R.id.btnStart)
         btnStop = findViewById(R.id.btnStop)
         tvLog = findViewById(R.id.tvLog)
+
+        // Делаем TextView прокручиваемым
+        tvLog.movementMethod = ScrollingMovementMethod()
 
         btnStart.setOnClickListener {
             val serviceIntent = Intent(this, CameraMonitorService::class.java)

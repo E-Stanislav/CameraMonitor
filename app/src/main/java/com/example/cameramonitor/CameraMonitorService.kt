@@ -1,96 +1,182 @@
 package com.example.cameramonitor
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.os.Build
-import android.os.IBinder
-import android.util.Log
-import androidx.core.app.NotificationCompat
 import android.hardware.camera2.CameraManager
+import android.os.Build
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.util.Log
 import android.app.AppOpsManager
-import android.app.AppOpsManager.OnOpChangedListener
 
 /**
- * CameraMonitorService отслеживает использование камеры в реальном времени.
+ * Обновлённый Service для отслеживания, какое приложение реально занимает камеру.
+ *
+ * Основные изменения:
+ * 1. Добавлено поле lastOpPackage, куда записываем каждый пакет, сообщивший об операции OPSTR_CAMERA.
+ * 2. В onCameraUnavailable (когда камера реально блокируется) сразу присваиваем currentPackageUsingCamera = lastOpPackage.
+ * 3. При освобождении камеры (onCameraAvailable) сбрасываем currentPackageUsingCamera.
  */
 class CameraMonitorService : Service() {
 
+    private val logTag = "CameraMonitorService"
+
     private lateinit var cameraManager: CameraManager
-    private lateinit var notificationManager: NotificationManager
+    private var availabilityCallback: CameraManager.AvailabilityCallback? = null
+
+    // ID последней захваченной камеры (например, "0" или "1")
+    private var currentCameraId: String? = null
+
+    // Флаг: действительно ли камера сейчас занята (по AvailabilityCallback)
+    private var isCameraInUse = false
+
+    // Пакет приложения, которое использует камеру (которое мы показываем в уведомлении)
+    private var currentPackageUsingCamera: String? = null
+
+    // Последний пакет, которому система сообщила o OPSTR_CAMERA (AppOpsManager)
+    private var lastOpPackage: String? = null
+
+    private var appOpsManager: AppOpsManager? = null
+    private val opChangedListener: AppOpsManager.OnOpChangedListener? = AppOpsManager.OnOpChangedListener { op, packageName ->
+        if (op == AppOpsManager.OPSTR_CAMERA) {
+            // Запоминаем пакет, вызвавший операцию CAMERA (независимо от того, занята камера или нет)
+            lastOpPackage = packageName
+            Log.d(logTag, "AppOps OPSTR_CAMERA: lastOpPackage = $packageName")
+
+            // Если камера уже реально занята, то сразу обновляем уведомление
+            if (isCameraInUse) {
+                currentPackageUsingCamera = lastOpPackage
+                updateNotificationAndBroadcast()
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
-
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        appOpsManager = getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager
 
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("Камера не используется"))
+        // Сразу запускаем foreground-уведомление, чтобы сервис не был убит системой
+        startForeground(
+            NotificationHelper.NOTIFICATION_ID,
+            NotificationHelper.buildNotification(this, "Камера не используется", "-")
+        )
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val appOpsManager = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-            appOpsManager.startWatchingMode(AppOpsManager.OPSTR_CAMERA, null, object : OnOpChangedListener {
-                override fun onOpChanged(op: String?, packageName: String?) {
-                    if (op == AppOpsManager.OPSTR_CAMERA) {
-                        val status = "Камера используется"
-                        updateNotification(status, packageName ?: "Неизвестно")
-                    }
-                }
-            })
-        } else {
-            cameraManager.registerAvailabilityCallback(object : CameraManager.AvailabilityCallback() {
+        registerCameraCallbacks()
+        registerAppOpsCallback()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterCameraCallbacks()
+        unregisterAppOpsCallback()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    /**
+     * Регистрируем CameraManager.AvailabilityCallback (API 21+), чтобы знать, когда камера занята/свободна.
+     */
+    private fun registerCameraCallbacks() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            availabilityCallback = object : CameraManager.AvailabilityCallback() {
+
                 override fun onCameraAvailable(cameraId: String) {
-                    updateNotification("Камера доступна", "—")
+                    super.onCameraAvailable(cameraId)
+                    // Камера освободилась
+                    onCameraStatusChanged(cameraId, false)
                 }
 
                 override fun onCameraUnavailable(cameraId: String) {
-                    updateNotification("Камера используется", "—")
+                    super.onCameraUnavailable(cameraId)
+                    // Камера занята
+                    onCameraStatusChanged(cameraId, true)
                 }
-            }, null)
+            }
+            cameraManager.registerAvailabilityCallback(availabilityCallback!!, Handler(Looper.getMainLooper()))
+        } else {
+            Log.w(logTag, "API < 21: невозможно отслеживать состояние камеры напрямую")
         }
     }
 
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                NOTIFICATION_CHANNEL_ID,
-                "Camera Monitor",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            notificationManager.createNotificationChannel(channel)
+    private fun unregisterCameraCallbacks() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && availabilityCallback != null) {
+            cameraManager.unregisterAvailabilityCallback(availabilityCallback!!)
         }
     }
 
-    private fun buildNotification(content: String): Notification {
-        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("CameraMonitor")
-            .setContentText(content)
-            .setSmallIcon(android.R.drawable.ic_menu_camera)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+    /**
+     * Регистрируем AppOpsManager.OnOpChangedListener (API 23+), чтобы узнавать пакет, который запросил OPSTR_CAMERA.
+     */
+    private fun registerAppOpsCallback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            opChangedListener?.let {
+                // Наблюдаем только за собственной областью пакетов (имя пакета — это applicationId)
+                appOpsManager?.startWatchingMode(AppOpsManager.OPSTR_CAMERA, packageName, it)
+            }
+        } else {
+            Log.w(logTag, "API < 23: невозможно отследить пакет, использующий камеру через AppOpsManager")
+        }
     }
 
-    private fun updateNotification(status: String, packageName: String) {
-        val notification = buildNotification("$status (App: $packageName)")
-        notificationManager.notify(NOTIFICATION_ID, notification)
+    private fun unregisterAppOpsCallback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            opChangedListener?.let {
+                appOpsManager?.stopWatchingMode(it)
+            }
+        }
+    }
 
+    /**
+     * Вызывается, когда камера либо занята (inUse=true), либо освобождена (inUse=false).
+     * @param cameraId — ID камеры ("0" или "1" и т. д.)
+     * @param inUse — true, если камера занята; false, когда освободилась
+     */
+    private fun onCameraStatusChanged(cameraId: String, inUse: Boolean) {
+        isCameraInUse = inUse
+        currentCameraId = cameraId
+
+        if (inUse) {
+            // Камера реально заблокирована — подставляем последний пакет, указавший OPSTR_CAMERA
+            currentPackageUsingCamera = lastOpPackage ?: "Неизвестно"
+        } else {
+            // Камера освободилась — сбрасываем информацию о пакете
+            currentPackageUsingCamera = null
+        }
+
+        updateNotificationAndBroadcast()
+    }
+
+    /**
+     * Обновляем foreground-уведомление и шлём broadcast MainActivity, чтобы обновить UI.
+     */
+    private fun updateNotificationAndBroadcast() {
+        // Определяем читаемое имя камеры (в данном примере: "Основная" или "Фронтальная")
+        val cameraName = when (currentCameraId) {
+            null -> "—"
+            "0" -> "Основная"
+            "1" -> "Фронтальная"
+            else -> "Camera $currentCameraId"
+        }
+        val statusText = if (isCameraInUse) "Занята" else "Не используется"
+        val pkgText = currentPackageUsingCamera ?: if (isCameraInUse) "Неизвестно" else "—"
+
+        // Обновляем уведомление (foreground)
+        val notif = NotificationHelper.buildNotification(
+            this,
+            "Камера: $statusText",
+            "Приложение: $pkgText\nКамера: $cameraName"
+        )
+        startForeground(NotificationHelper.NOTIFICATION_ID, notif)
+
+        // Шлём Intent, чтобы MainActivity (если она открыта) получила новые данные и дописала лог
         val intent = Intent(MainActivity.ACTION_CAMERA_STATUS_CHANGED).apply {
-            putExtra(MainActivity.EXTRA_STATUS, status)
-            putExtra(MainActivity.EXTRA_PACKAGE, packageName)
+            putExtra(MainActivity.EXTRA_STATUS, statusText)
+            putExtra(MainActivity.EXTRA_PACKAGE, pkgText)
+            putExtra(MainActivity.EXTRA_CAMERA, cameraName)
         }
         sendBroadcast(intent)
-    }
-
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
-    }
-
-    companion object {
-        private const val NOTIFICATION_CHANNEL_ID = "camera_monitor_channel"
-        private const val NOTIFICATION_ID = 1
     }
 }
