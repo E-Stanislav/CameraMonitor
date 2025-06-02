@@ -18,6 +18,8 @@ class CameraBroadcastReceiver(
         val pkg    = intent.getStringExtra(MainActivity.EXTRA_PACKAGE) ?: return
         val camera = intent.getStringExtra(MainActivity.EXTRA_CAMERA) ?: return
 
+        Log.d("CameraBroadcastReceiver", "onReceive: camera=$camera, status=$status, pkg=$pkg")
+
         listener(camera, status, pkg)
     }
 

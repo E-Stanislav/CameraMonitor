@@ -25,7 +25,7 @@
         android:layout_weight="1"
         android:background="#EEEEEE"
         android:padding="8dp"
-        android:text="Log will appear here..."
+        android:text="Log will appear here...\n"
         android:textSize="14sp" />
 
 </LinearLayout>

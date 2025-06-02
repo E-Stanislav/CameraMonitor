@@ -134,7 +134,15 @@ class CameraMonitorService : Service() {
      * @param cameraId — ID камеры ("0" или "1" и т. д.)
      * @param inUse — true, если камера занята; false, когда освободилась
      */
+    private var lastStatusChangeTime: Long = 0
+
     private fun onCameraStatusChanged(cameraId: String, inUse: Boolean) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastStatusChangeTime < 1000) return // Игнорируем повторные вызовы в течение 1 секунды
+        lastStatusChangeTime = currentTime
+
+        if (isCameraInUse == inUse && currentCameraId == cameraId) return
+
         isCameraInUse = inUse
         currentCameraId = cameraId
 
