@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+    <!-- CAMERA permission *не* обязательна, но на некоторых прошивках без неё AppOps не работает -->
+    <uses-permission android:name="android.permission.CAMERA"/>
 
 
     <application

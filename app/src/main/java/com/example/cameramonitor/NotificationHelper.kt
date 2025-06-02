@@ -33,4 +33,9 @@ object NotificationHelper {
             notificationManager.createNotificationChannel(channel)
         }
     }
+
+    fun notify(context: Context, notificationId: Int, notification: Notification) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(notificationId, notification)
+    }
 }

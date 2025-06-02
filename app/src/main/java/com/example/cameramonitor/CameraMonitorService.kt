@@ -155,21 +155,22 @@ class CameraMonitorService : Service() {
     private fun updateNotificationAndBroadcast() {
         // Определяем читаемое имя камеры (в данном примере: "Основная" или "Фронтальная")
         val cameraName = when (currentCameraId) {
-            null -> "—"
-            "0" -> "Основная"
-            "1" -> "Фронтальная"
-            else -> "Camera $currentCameraId"
+            null -> "Устройство камеры неизвестно"
+            "0" -> "Основная камера"
+            "1" -> "Фронтальная камера"
+            else -> "Камера ID: $currentCameraId"
         }
-        val statusText = if (isCameraInUse) "Занята" else "Не используется"
-        val pkgText = currentPackageUsingCamera ?: if (isCameraInUse) "Неизвестно" else "—"
+        val statusText = if (isCameraInUse) "Камера занята" else "Камера свободна"
+        val pkgText = currentPackageUsingCamera ?: if (isCameraInUse) "Приложение неизвестно" else "—"
 
         // Обновляем уведомление (foreground)
+        val uniqueNotificationId = System.currentTimeMillis().toInt()
         val notif = NotificationHelper.buildNotification(
             this,
             "Камера: $statusText",
-            "Приложение: $pkgText\nКамера: $cameraName"
+            "Приложение: $pkgText\nУстройство: $cameraName"
         )
-        startForeground(NotificationHelper.NOTIFICATION_ID, notif)
+        NotificationHelper.notify(this, uniqueNotificationId, notif)
 
         // Шлём Intent, чтобы MainActivity (если она открыта) получила новые данные и дописала лог
         val intent = Intent(MainActivity.ACTION_CAMERA_STATUS_CHANGED).apply {
