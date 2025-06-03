@@ -10,6 +10,8 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import android.app.AppOpsManager
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 /**
  * Обновлённый Service для отслеживания, какое приложение реально занимает камеру.
@@ -22,6 +24,11 @@ import android.app.AppOpsManager
 class CameraMonitorService : Service() {
 
     private val logTag = "CameraMonitorService"
+
+    companion object {
+        const val MAX_LOG_SIZE = 100
+        val eventLog: MutableList<String> = mutableListOf()
+    }
 
     private lateinit var cameraManager: CameraManager
     private var availabilityCallback: CameraManager.AvailabilityCallback? = null
@@ -179,6 +186,15 @@ class CameraMonitorService : Service() {
             "Приложение: $pkgText\nУстройство: $cameraName"
         )
         NotificationHelper.notify(this, uniqueNotificationId, notif)
+
+        // Добавляем запись в общий лог
+        val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+            .format(System.currentTimeMillis())
+        val logLine = "[$time] $cameraName: $statusText  \u2190 $pkgText"
+        synchronized(eventLog) {
+            eventLog.add(logLine)
+            if (eventLog.size > MAX_LOG_SIZE) eventLog.removeAt(0)
+        }
 
         // Шлём Intent, чтобы MainActivity (если она открыта) получила новые данные и дописала лог
         val intent = Intent(MainActivity.ACTION_CAMERA_STATUS_CHANGED).apply {
