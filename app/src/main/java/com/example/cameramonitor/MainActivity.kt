@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.text.method.ScrollingMovementMethod
+import android.util.Log
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
@@ -33,10 +34,27 @@ class MainActivity : AppCompatActivity() {
 
     // Лямбда, принимающая (camera, status, pkg)
     private val cameraReceiver = CameraBroadcastReceiver { camera, status, pkg ->
-        val logLine = "[${timeFmt.format(System.currentTimeMillis())}] $camera: $status ← $pkg\n"
-        tvLog.append(logLine)
+        Log.d("MainActivity", "Received camera event: camera=$camera, status=$status, pkg=$pkg")
+        
+        // Получаем человекочитаемое имя приложения
+        val appName = try {
+            val ai = packageManager.getApplicationInfo(pkg, 0)
+            packageManager.getApplicationLabel(ai).toString()
+        } catch (e: Exception) {
+            pkg
+        }
+        
+        // Форматируем сообщение для лога
+        val logLine = "[${timeFmt.format(System.currentTimeMillis())}] Камера $camera: $status (${appName})\n"
+        runOnUiThread {
+            tvLog.append(logLine)
+            // Автоскролл к последней строке
+            val layout = tvLog.layout ?: return@runOnUiThread
+            val diff = layout.getLineBottom(tvLog.lineCount - 1) - tvLog.height
+            if (diff > 0) tvLog.scrollTo(0, diff)
+        }
 
-        sendCameraNotification(camera, status, pkg)
+        sendCameraNotification(camera, status, appName)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,16 +94,18 @@ class MainActivity : AppCompatActivity() {
 
         // 2) Создаём канал уведомлений (Android 8+)
         createNotificationChannel()
-    }
 
-    override fun onResume() {
-        super.onResume()
+        // 3) Регистрируем BroadcastReceiver для получения обновлений о камере
         registerReceiver(cameraReceiver, CameraBroadcastReceiver.intentFilter())
     }
 
-    override fun onPause() {
-        super.onPause()
-        unregisterReceiver(cameraReceiver)
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(cameraReceiver)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error unregistering receiver", e)
+        }
     }
 
     override fun onRequestPermissionsResult(
@@ -162,31 +182,13 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    /** Логируем в TextView + автоскролл вниз */
-    private fun appendLog(camera: String, status: String, pkg: String) {
-        val line = "[${timeFmt.format(System.currentTimeMillis())}] $camera: $status  ← $pkg\n"
-        tvLog.append(line)
-
-        val layout = tvLog.layout ?: return
-        val diff = layout.getLineBottom(tvLog.lineCount - 1) - tvLog.height
-        if (diff > 0) tvLog.scrollTo(0, diff)
-    }
-
     /**
      * Посылаем уведомление через NotificationManager
      * @param camera  – например, "Front" / "Back"
      * @param status  – "Открыл камеру" / "Закрыл камеру"
      * @param pkg     – package name приложения
      */
-    private fun sendCameraNotification(camera: String, status: String, pkg: String) {
-        // Пытаемся получить человекочитаемое имя приложения
-        val appName = try {
-            val ai = packageManager.getApplicationInfo(pkg, 0)
-            packageManager.getApplicationLabel(ai).toString()
-        } catch (e: Exception) {
-            pkg
-        }
-
+    private fun sendCameraNotification(camera: String, status: String, appName: String) {
         val title = "Камера: $camera"
         val text = "Приложение \"$appName\" $status"
 
