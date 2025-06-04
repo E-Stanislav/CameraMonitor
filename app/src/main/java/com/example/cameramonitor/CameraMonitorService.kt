@@ -163,9 +163,9 @@ class CameraMonitorService : Service() {
     private fun updateNotificationAndBroadcast() {
         // Определяем читаемое имя камеры (в данном примере: "Основная" или "Фронтальная")
         val cameraName = when (currentCameraId) {
-            null -> "Устройство камеры неизвестно"
-            "0" -> "Основная камера"
-            "1" -> "Фронтальная камера"
+            null -> "Камера неизвестна"
+            "0" -> "Back"
+            "1" -> "Front"
             else -> "Камера ID: $currentCameraId"
         }
         val statusText = if (isCameraInUse) "Камера занята" else "Камера свободна"
