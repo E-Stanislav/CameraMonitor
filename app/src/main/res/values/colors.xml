@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background_color">#F5F5F5</color>
+    <color name="start_button_color">#4CAF50</color>
+    <color name="stop_button_color">#F44336</color>
+    <color name="black">#000000</color>
+</resources>

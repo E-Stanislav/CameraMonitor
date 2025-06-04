@@ -13,11 +13,13 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.method.ScrollingMovementMethod
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -41,6 +43,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Set the default color of the status circle to red when the app is opened
+        val statusCircle = findViewById<ImageView>(R.id.ivStatus)
+        statusCircle.setColorFilter(ContextCompat.getColor(this, R.color.stop_button_color))
+
         // Проверяем runtime-разрешение POST_NOTIFICATIONS (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -57,11 +63,15 @@ class MainActivity : AppCompatActivity() {
         tvLog    = findViewById(R.id.tvLog)
         tvLog.movementMethod = ScrollingMovementMethod()
 
-        btnStart.setOnClickListener { startClicked() }
+        btnStart.setOnClickListener {
+            startClicked()
+            updateStatusCircle(true)
+        }
         btnStop.setOnClickListener {
             stopService(Intent(this, CameraMonitorService::class.java))
             btnStart.isEnabled = true
             btnStop.isEnabled  = false
+            updateStatusCircle(false)
         }
 
         // 2) Создаём канал уведомлений (Android 8+)
@@ -192,6 +202,13 @@ class MainActivity : AppCompatActivity() {
             val notificationId = System.currentTimeMillis().toInt()
             notify(notificationId, builder.build())
         }
+    }
+
+    // Added logic to change the color of the status circle based on monitoring state
+    private fun updateStatusCircle(isMonitoring: Boolean) {
+        val statusCircle = findViewById<ImageView>(R.id.ivStatus)
+        val color = if (isMonitoring) R.color.start_button_color else R.color.stop_button_color
+        statusCircle.setColorFilter(ContextCompat.getColor(this, color))
     }
 
     companion object {

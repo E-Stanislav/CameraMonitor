@@ -4,4 +4,5 @@
     <string name="start_monitoring">Start Monitoring</string>
     <string name="stop_monitoring">Stop Monitoring</string>
     <string name="log_placeholder">Log will appear here...\n</string>
+    <string name="status_placeholder">Monitoring status</string>
 </resources>

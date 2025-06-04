@@ -5,26 +5,30 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp">
+    android:padding="16dp"
+    android:background="@color/background_color">
 
     <!-- Start Monitoring -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnStart"
         style="@style/Widget.MaterialComponents.Button"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/start_monitoring"
         app:icon="@drawable/ic_play_arrow_24"
         app:iconPadding="8dp"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/ivStatus"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        android:backgroundTint="@color/start_button_color"
+        app:cornerRadius="16dp"
+        android:elevation="4dp"/>
 
     <!-- Stop Monitoring -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnStop"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/stop_monitoring"
         android:enabled="false"
@@ -32,17 +36,32 @@
         app:iconPadding="8dp"
         app:layout_constraintTop_toBottomOf="@id/btnStart"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintEnd_toStartOf="@id/ivStatus"
+        android:backgroundTint="@color/stop_button_color"
+        app:cornerRadius="16dp"
+        android:elevation="4dp"/>
+
+    <!-- Compact status indicator using ImageView -->
+    <ImageView
+        android:id="@+id/ivStatus"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:contentDescription="@string/status_placeholder"
+        app:layout_constraintTop_toTopOf="@id/btnStart"
+        app:layout_constraintBottom_toBottomOf="@id/btnStop"
+        app:layout_constraintStart_toEndOf="@id/btnStop"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:src="@drawable/ic_status_placeholder"/>
 
     <!-- Log Area -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardLog"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="0dp"
-        app:cardElevation="0dp"
+        android:layout_marginTop="16dp"
+        app:cardElevation="4dp"
         app:cardUseCompatPadding="true"
-        app:layout_constraintTop_toBottomOf="@id/btnStop"
+        app:layout_constraintTop_toBottomOf="@id/ivStatus"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -51,7 +70,7 @@
             android:id="@+id/tvLog"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="7dp"
+            android:padding="16dp"
             android:text="@string/log_placeholder"
             android:textSize="16sp"
             android:scrollbars="vertical" />
