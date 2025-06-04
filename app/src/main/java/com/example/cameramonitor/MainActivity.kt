@@ -101,6 +101,11 @@ class MainActivity : AppCompatActivity() {
         tvLog    = findViewById(R.id.tvLog)
         tvLog.movementMethod = ScrollingMovementMethod()
 
+        // Восстанавливаем лог при перевороте экрана
+        if (savedInstanceState != null) {
+            tvLog.text = savedInstanceState.getCharSequence("log_text")
+        }
+
         btnStart.setOnClickListener {
             startClicked()
             updateStatusCircle(true)
@@ -143,6 +148,11 @@ class MainActivity : AppCompatActivity() {
                 ).show()
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putCharSequence("log_text", tvLog.text)
     }
 
     /* ----------------- Private helpers ----------------- */
