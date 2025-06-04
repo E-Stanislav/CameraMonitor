@@ -32,20 +32,31 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvLog:    TextView
     private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
+    companion object {
+        private const val CHANNEL_ID = "camera_monitor_channel"
+        private const val REQ_CODE_POST_NOTIF = 1001
+
+        const val ACTION_CAMERA_STATUS_CHANGED = "com.example.cameramonitor.CAMERA_STATUS_CHANGED"
+        const val EXTRA_STATUS = "extra_status"
+        const val EXTRA_PACKAGE = "extra_package"
+        const val EXTRA_CAMERA = "extra_camera"
+        const val EXTRA_APP_NAME = "extra_app_name"
+        const val EXTRA_SOURCE_DIR = "extra_source_dir"
+    }
+
     // Лямбда, принимающая (camera, status, pkg)
     private val cameraReceiver = CameraBroadcastReceiver { camera, status, pkg ->
         Log.d("MainActivity", "Received camera event: camera=$camera, status=$status, pkg=$pkg")
         
-        // Получаем человекочитаемое имя приложения
-        val appName = try {
-            val ai = packageManager.getApplicationInfo(pkg, 0)
-            packageManager.getApplicationLabel(ai).toString()
-        } catch (e: Exception) {
-            pkg
-        }
+        // Получаем дополнительную информацию из Intent
+        val appName = intent.getStringExtra(EXTRA_APP_NAME) ?: pkg
+        val sourceDir = intent.getStringExtra(EXTRA_SOURCE_DIR) ?: "unknown"
         
-        // Форматируем сообщение для лога
-        val logLine = "[${timeFmt.format(System.currentTimeMillis())}] Камера $camera: $status (${appName})\n"
+        // Форматируем сообщение для лога с расширенной информацией
+        val logLine = "[${timeFmt.format(System.currentTimeMillis())}] " +
+                      "Камера $camera: $status\n" +
+                      "Приложение: $appName\n\n"
+
         runOnUiThread {
             tvLog.append(logLine)
             // Автоскролл к последней строке
@@ -54,8 +65,17 @@ class MainActivity : AppCompatActivity() {
             if (diff > 0) tvLog.scrollTo(0, diff)
         }
 
-        sendCameraNotification(camera, status, appName)
+        // Создаем AppData для уведомления
+        val appInfo = AppData(appName, pkg, -1, sourceDir)
+        sendCameraNotification(camera, status, appInfo)
     }
+
+    private data class AppData(
+        val name: String,
+        val packageName: String,
+        val targetSdkVersion: Int,
+        val sourceDir: String
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -188,9 +208,11 @@ class MainActivity : AppCompatActivity() {
      * @param status  – "Открыл камеру" / "Закрыл камеру"
      * @param pkg     – package name приложения
      */
-    private fun sendCameraNotification(camera: String, status: String, appName: String) {
+    private fun sendCameraNotification(camera: String, status: String, appInfo: AppData) {
         val title = "Камера: $camera"
-        val text = "Приложение \"$appName\" $status"
+        val text = "Приложение \"${appInfo.name}\"\n" +
+                  "Package: ${appInfo.packageName}\n" +
+                  "Статус: $status"
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_camera)
@@ -211,15 +233,5 @@ class MainActivity : AppCompatActivity() {
         val statusCircle = findViewById<ImageView>(R.id.ivStatus)
         val color = if (isMonitoring) R.color.start_button_color else R.color.stop_button_color
         statusCircle.setColorFilter(ContextCompat.getColor(this, color))
-    }
-
-    companion object {
-        private const val CHANNEL_ID = "camera_monitor_channel"
-        private const val REQ_CODE_POST_NOTIF = 1001
-
-        const val ACTION_CAMERA_STATUS_CHANGED = "com.example.cameramonitor.CAMERA_STATUS_CHANGED"
-        const val EXTRA_STATUS  = "extra_status"
-        const val EXTRA_PACKAGE = "extra_package"
-        const val EXTRA_CAMERA  = "extra_camera"
     }
 }

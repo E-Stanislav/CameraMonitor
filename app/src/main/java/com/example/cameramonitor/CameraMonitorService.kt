@@ -116,8 +116,8 @@ class CameraMonitorService : Service() {
     private fun registerAppOpsCallback() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             opChangedListener?.let {
-                // Наблюдаем только за собственной областью пакетов (имя пакета — это applicationId)
-                appOpsManager?.startWatchingMode(AppOpsManager.OPSTR_CAMERA, packageName, it)
+                // Наблюдаем за всеми пакетами, использующими камеру
+                appOpsManager?.startWatchingMode(AppOpsManager.OPSTR_CAMERA, null, it)
             }
         } else {
             Log.w(logTag, "API < 23: невозможно отследить пакет, использующий камеру через AppOpsManager")
@@ -139,6 +139,24 @@ class CameraMonitorService : Service() {
      */
     private var lastStatusChangeTime: Long = 0
 
+    // Получить пакет активного (foreground) приложения через UsageStatsManager
+    private fun getForegroundAppPackage(): String? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? android.app.usage.UsageStatsManager ?: return null
+            val time = System.currentTimeMillis()
+            val appList = usm.queryUsageStats(
+                android.app.usage.UsageStatsManager.INTERVAL_DAILY,
+                time - 5000,
+                time
+            )
+            if (!appList.isNullOrEmpty()) {
+                val recentApp = appList.maxByOrNull { it.lastTimeUsed }
+                return recentApp?.packageName
+            }
+        }
+        return null
+    }
+
     private fun onCameraStatusChanged(cameraId: String, inUse: Boolean) {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastStatusChangeTime < 1000) return // Игнорируем повторные вызовы в течение 1 секунды
@@ -151,7 +169,12 @@ class CameraMonitorService : Service() {
 
         if (inUse) {
             // Камера реально заблокирована — подставляем последний пакет, указавший OPSTR_CAMERA
-            currentPackageUsingCamera = lastOpPackage ?: "Неизвестно"
+            currentPackageUsingCamera = lastOpPackage
+            if (currentPackageUsingCamera.isNullOrEmpty() || currentPackageUsingCamera == "Неизвестно") {
+                // fallback: пробуем определить foreground app
+                currentPackageUsingCamera = getForegroundAppPackage() ?: "Неизвестно"
+                Log.d(logTag, "Fallback foreground app: $currentPackageUsingCamera")
+            }
         } else {
             // Камера освободилась — сбрасываем информацию о пакете
             currentPackageUsingCamera = null
@@ -164,31 +187,78 @@ class CameraMonitorService : Service() {
      * Обновляем foreground-уведомление и шлём broadcast MainActivity, чтобы обновить UI.
      */
     private fun updateNotificationAndBroadcast() {
-        // Определяем читаемое имя камеры (в данном примере: "Основная" или "Фронтальная")
+        // Определяем читаемое имя камеры
         val cameraName = when (currentCameraId) {
             null -> "Камера неизвестна"
             "0" -> "Back"
             "1" -> "Front"
             else -> "Камера ID: $currentCameraId"
         }
+        Log.d(logTag, "isCameraInUse = $isCameraInUse, currentPackageUsingCamera = $currentPackageUsingCamera")
+        Log.d(logTag, "Camera name: $cameraName")
+
+        // Определяем информацию о пакете, использующем камеру
+        val packageInfo = if (isCameraInUse && currentPackageUsingCamera != null && currentPackageUsingCamera != "Неизвестно") {
+            try {
+                val packageName = currentPackageUsingCamera!!
+                val ai = packageManager.getApplicationInfo(packageName, 0)
+                Log.d(logTag, "Found application info for package: $packageName")
+                PackageInfo(
+                    appName = packageManager.getApplicationLabel(ai).toString(),
+                    packageName = packageName,
+                    sourceDir = ai.sourceDir
+                )
+            } catch (e: SecurityException) {
+                Log.w(logTag, "No permission to get package info for: $currentPackageUsingCamera", e)
+                PackageInfo(
+                    appName = "Защищённое приложение",
+                    packageName = currentPackageUsingCamera!!,
+                    sourceDir = "protected"
+                )
+            } catch (e: Exception) {
+                Log.e(logTag, "Failed to get package info for: $currentPackageUsingCamera", e)
+                PackageInfo(
+                    appName = "Неопределённое приложение",
+                    packageName = currentPackageUsingCamera!!,
+                    sourceDir = "unknown"
+                )
+            }
+        } else {
+            PackageInfo(
+                appName = if (isCameraInUse) "Неизвестное приложение" else "Не используется",
+                packageName = if (isCameraInUse) "<unknown>" else "—",
+                sourceDir = "not_in_use"
+            )
+        }
+
+        
         val statusText = if (isCameraInUse) "Камера занята" else "Камера свободна"
-        val pkgText = currentPackageUsingCamera ?: if (isCameraInUse) "Приложение неизвестно" else "—"
 
         // Обновляем уведомление (foreground)
-        val uniqueNotificationId = System.currentTimeMillis().toInt()
         val notif = NotificationHelper.buildNotification(
             this,
             "Камера: $statusText",
-            "Приложение: $pkgText\nУстройство: $cameraName"
+            "Приложение: ${packageInfo.appName}\n" +
+            "Package: ${packageInfo.packageName}\n" +
+            "Устройство: $cameraName"
         )
-        NotificationHelper.notify(this, uniqueNotificationId, notif)
+        NotificationHelper.notify(this, NotificationHelper.NOTIFICATION_ID, notif)
 
-        // Шлём Intent, чтобы MainActivity (если она открыта) получила новые данные и дописала лог
+        // Шлём Intent, чтобы MainActivity получила новые данные и дописала лог
         val intent = Intent(MainActivity.ACTION_CAMERA_STATUS_CHANGED).apply {
             putExtra(MainActivity.EXTRA_STATUS, statusText)
-            putExtra(MainActivity.EXTRA_PACKAGE, pkgText)
+            putExtra(MainActivity.EXTRA_PACKAGE, packageInfo.packageName)
             putExtra(MainActivity.EXTRA_CAMERA, cameraName)
+            // Добавляем дополнительную информацию о приложении
+            putExtra(MainActivity.EXTRA_APP_NAME, packageInfo.appName)
+            putExtra(MainActivity.EXTRA_SOURCE_DIR, packageInfo.sourceDir)
         }
         sendBroadcast(intent)
     }
+
+    private data class PackageInfo(
+        val appName: String,
+        val packageName: String,
+        val sourceDir: String
+    )
 }
