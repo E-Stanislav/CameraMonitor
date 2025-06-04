@@ -7,16 +7,6 @@
     android:layout_height="match_parent"
     android:padding="16dp">
 
-    <!-- Top App Bar -->
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/topAppBar"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:title="@string/app_name"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
-
     <!-- Start Monitoring -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnStart"
@@ -28,7 +18,7 @@
         app:iconPadding="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/topAppBar" />
+        app:layout_constraintTop_toTopOf="parent" />
 
     <!-- Stop Monitoring -->
     <com.google.android.material.button.MaterialButton

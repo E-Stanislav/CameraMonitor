@@ -10,6 +10,8 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import android.app.AppOpsManager
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 /**
  * Обновлённый Service для отслеживания, какое приложение реально занимает камеру.
@@ -22,6 +24,7 @@ import android.app.AppOpsManager
 class CameraMonitorService : Service() {
 
     private val logTag = "CameraMonitorService"
+    private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
     private lateinit var cameraManager: CameraManager
     private var availabilityCallback: CameraManager.AvailabilityCallback? = null

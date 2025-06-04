@@ -31,9 +31,9 @@ class MainActivity : AppCompatActivity() {
 
     // Лямбда, принимающая (camera, status, pkg)
     private val cameraReceiver = CameraBroadcastReceiver { camera, status, pkg ->
-        tvLog.append("Ваш start\n")
-        appendLog(camera, status, pkg)
-        tvLog.append("Ваш end\n")
+        val logLine = "[${timeFmt.format(System.currentTimeMillis())}] $camera: $status ← $pkg\n"
+        tvLog.append(logLine)
+
         sendCameraNotification(camera, status, pkg)
     }
 
