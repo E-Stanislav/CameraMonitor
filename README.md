@@ -39,7 +39,7 @@
 
 Скриншоты интерфейса и уведомлений размещайте в папке `screenshots/`.
 
-![Главный экран](screenshots/Screenshot_20250604png.png)
+<img src="screenshots/Screenshot_20250604png.png" width="200"/>
 
 ---
 
