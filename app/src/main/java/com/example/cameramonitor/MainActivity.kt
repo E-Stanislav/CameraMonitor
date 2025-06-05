@@ -47,25 +47,32 @@ class MainActivity : AppCompatActivity() {
     // Лямбда, принимающая (camera, status, pkg)
     private val cameraReceiver = CameraBroadcastReceiver { camera, status, pkg ->
         Log.d("MainActivity", "Received camera event: camera=$camera, status=$status, pkg=$pkg")
-        
-        // Получаем дополнительную информацию из Intent
         val appName = intent.getStringExtra(EXTRA_APP_NAME) ?: pkg
         val sourceDir = intent.getStringExtra(EXTRA_SOURCE_DIR) ?: "unknown"
-        
-        // Форматируем сообщение для лога с расширенной информацией
-        val logLine = "[${timeFmt.format(System.currentTimeMillis())}] " +
-                      "Камера $camera: $status\n" +
-                      "Приложение: $appName\n\n"
-
+        val time = timeFmt.format(System.currentTimeMillis())
+        val isCameraFree = status.contains("свободна", ignoreCase = true)
+        val logLine = if (isCameraFree) {
+            "[$time] Камера $camera: $status\n\n"
+        } else {
+            "[$time] Камера $camera: $status\nПриложение: $appName\n\n"
+        }
+        val spannable = android.text.SpannableStringBuilder(logLine)
+        if (!isCameraFree) {
+            val appLabel = "Приложение: "
+            val start = logLine.indexOf(appLabel) + appLabel.length
+            val end = start + appName.length
+            if (start >= appLabel.length && end <= logLine.length) {
+                spannable.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                spannable.setSpan(android.text.style.ForegroundColorSpan(android.graphics.Color.rgb(33, 150, 243)), start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                spannable.setSpan(android.text.style.RelativeSizeSpan(1.2f), start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        }
         runOnUiThread {
-            tvLog.append(logLine)
-            // Автоскролл к последней строке
+            tvLog.append(spannable)
             val layout = tvLog.layout ?: return@runOnUiThread
             val diff = layout.getLineBottom(tvLog.lineCount - 1) - tvLog.height
             if (diff > 0) tvLog.scrollTo(0, diff)
         }
-
-        // Создаем AppData для уведомления
         val appInfo = AppData(appName, pkg, -1, sourceDir)
         sendCameraNotification(camera, status, appInfo)
     }
