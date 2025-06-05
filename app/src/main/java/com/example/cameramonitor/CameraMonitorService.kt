@@ -56,6 +56,27 @@ class CameraMonitorService : Service() {
         }
     }
 
+    private var screenReceiverRegistered = false
+    private val screenReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_USER_PRESENT || intent?.action == Intent.ACTION_SCREEN_ON) {
+                Log.d(logTag, "Screen unlock or on event")
+                if (isCameraInUse) {
+                    // Камера занята — пробуем обновить foreground app
+                    val fg = getForegroundAppPackage()
+                    if (!fg.isNullOrEmpty() && fg != packageName) {
+                        currentPackageUsingCamera = fg
+                        updateNotificationAndBroadcast()
+                    }
+                } else {
+                    // Камера не используется — сбрасываем текущее приложение
+                    currentPackageUsingCamera = null
+                    updateNotificationAndBroadcast()
+                }
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -69,12 +90,25 @@ class CameraMonitorService : Service() {
 
         registerCameraCallbacks()
         registerAppOpsCallback()
+
+        // Регистрируем receiver для разблокировки экрана
+        if (!screenReceiverRegistered) {
+            val filter = android.content.IntentFilter()
+            filter.addAction(Intent.ACTION_USER_PRESENT)
+            filter.addAction(Intent.ACTION_SCREEN_ON)
+            registerReceiver(screenReceiver, filter)
+            screenReceiverRegistered = true
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         unregisterCameraCallbacks()
         unregisterAppOpsCallback()
+        if (screenReceiverRegistered) {
+            unregisterReceiver(screenReceiver)
+            screenReceiverRegistered = false
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -157,6 +191,21 @@ class CameraMonitorService : Service() {
         return null
     }
 
+    // Проверка: есть ли у пакета разрешение на использование камеры
+    private fun hasCameraPermissionForPackage(pkg: String?): Boolean {
+        if (pkg.isNullOrEmpty() || appOpsManager == null) return false
+        return try {
+            val mode = appOpsManager!!.checkOpNoThrow(
+                AppOpsManager.OPSTR_CAMERA,
+                packageManager.getApplicationInfo(pkg, 0).uid,
+                pkg
+            )
+            mode == AppOpsManager.MODE_ALLOWED || mode == AppOpsManager.MODE_FOREGROUND
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun onCameraStatusChanged(cameraId: String, inUse: Boolean) {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastStatusChangeTime < 1000) return // Игнорируем повторные вызовы в течение 1 секунды
@@ -168,13 +217,14 @@ class CameraMonitorService : Service() {
         currentCameraId = cameraId
 
         if (inUse) {
-            // Камера реально заблокирована — подставляем последний пакет, указавший OPSTR_CAMERA
-            currentPackageUsingCamera = lastOpPackage
-            if (currentPackageUsingCamera.isNullOrEmpty() || currentPackageUsingCamera == "Неизвестно") {
-                // fallback: пробуем определить foreground app
-                currentPackageUsingCamera = getForegroundAppPackage() ?: "Неизвестно"
-                Log.d(logTag, "Fallback foreground app: $currentPackageUsingCamera")
+            // Приоритет: lastOpPackage -> foreground app -> "Неизвестно"
+            var candidate = lastOpPackage
+            if (candidate.isNullOrEmpty() || candidate == packageName) {
+                // Если не удалось определить или это наш пакет — fallback на foreground app
+                candidate = getForegroundAppPackage()
             }
+            currentPackageUsingCamera = candidate ?: "Неизвестно"
+            Log.d(logTag, "Camera in use by: $currentPackageUsingCamera")
         } else {
             // Камера освободилась — сбрасываем информацию о пакете
             currentPackageUsingCamera = null
