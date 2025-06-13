@@ -88,6 +88,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Добавляем меню
+        // (см. onCreateOptionsMenu/onOptionsItemSelected ниже)
+
         // Set the default color of the status circle to red when the app is opened
         val statusCircle = findViewById<ImageView>(R.id.ivStatus)
         statusCircle.setColorFilter(ContextCompat.getColor(this, R.color.stop_button_color))
@@ -160,6 +163,40 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putCharSequence("log_text", tvLog.text)
+    }
+
+    override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.menu_main -> {
+                // Главная — просто ничего не делаем (или можно сбросить фрагмент)
+                return true
+            }
+            R.id.menu_stats -> {
+                // Статистика по дням (заглушка)
+                Toast.makeText(this, "Статистика по дням (в разработке)", Toast.LENGTH_SHORT).show()
+                return true
+            }
+            R.id.menu_settings -> {
+                // Настройка (заглушка)
+                Toast.makeText(this, "Настройки (в разработке)", Toast.LENGTH_SHORT).show()
+                return true
+            }
+            R.id.menu_about -> {
+                // О приложении (заглушка)
+                AlertDialog.Builder(this)
+                    .setTitle("О приложении")
+                    .setMessage("CameraMonitor\nВерсия 1.0\n\nМониторинг использования камеры.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return true
+            }
+        }
+        return super.onOptionsItemSelected(item)
     }
 
     /* ----------------- Private helpers ----------------- */
