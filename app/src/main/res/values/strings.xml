@@ -5,4 +5,14 @@
     <string name="stop_monitoring">Stop Monitoring</string>
     <string name="log_placeholder">Log will appear here...\n</string>
     <string name="status_placeholder">Monitoring status</string>
+    <string name="settings_title">Настройки</string>
+    <string name="log_size_label">Максимальный размер лога (событий):</string>
+    <string name="theme_label">Тема приложения:</string>
+    <string name="theme_light">Светлая</string>
+    <string name="theme_dark">Тёмная</string>
+    <string name="theme_system">Авто</string>
+    <string name="save_settings">Сохранить</string>
+    <string name="settings_saved">Настройки сохранены</string>
+    <string name="clear_log">Очистить лог</string>
+    <string name="log_cleared">Лог очищен</string>
 </resources>

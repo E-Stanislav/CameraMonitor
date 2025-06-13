@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@color/colorBackground">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Настройки"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Максимальный размер лога (событий):"
+        android:layout_marginTop="8dp"/>
+
+    <EditText
+        android:id="@+id/etLogSize"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="number"
+        android:hint="1000"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Тема приложения:"
+        android:layout_marginTop="16dp"/>
+
+    <RadioGroup
+        android:id="@+id/rgTheme"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <RadioButton
+            android:id="@+id/rbLight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Светлая"/>
+        <RadioButton
+            android:id="@+id/rbDark"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Тёмная"/>
+        <RadioButton
+            android:id="@+id/rbSystem"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Авто"/>
+    </RadioGroup>
+
+    <Button
+        android:id="@+id/btnSaveSettings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Сохранить"
+        android:layout_marginTop="24dp"/>
+
+    <Button
+        android:id="@+id/btnClearLog"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Очистить лог"
+        android:layout_marginTop="8dp"/>
+</LinearLayout>

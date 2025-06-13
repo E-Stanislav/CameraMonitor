@@ -4,4 +4,6 @@
     <color name="start_button_color">#4CAF50</color>
     <color name="stop_button_color">#F44336</color>
     <color name="black">#000000</color>
+    <color name="colorBackground">#F5F5F5</color>
+    <color name="cardBackground">#FFFFFF</color>
 </resources>

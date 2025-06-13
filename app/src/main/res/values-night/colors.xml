@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background_dark">#181A20</color>
+    <color name="surface_dark">#23272F</color>
+    <color name="onBackground_dark">#FFFFFF</color>
+    <color name="onSurface_dark">#E0E0E0</color>
+    <color name="colorBackground">#181A20</color>
+    <color name="cardBackground">#23272F</color>
+    <color name="background_color">#181A20</color>
+</resources>

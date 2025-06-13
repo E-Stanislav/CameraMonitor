@@ -53,6 +53,7 @@ class MainActivity : AppCompatActivity() {
         val isCameraFree = status.contains("свободна", ignoreCase = true)
         val event = LogEvent(time, camera, status, appName, isCameraFree)
         logEvents.add(event)
+        enforceLogSizeLimit()
         renderLog()
         saveLogEventsToPrefs()
         val appInfo = AppData(appName, pkg, -1, intent.getStringExtra(EXTRA_SOURCE_DIR) ?: "unknown")
@@ -177,8 +178,8 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
             R.id.menu_settings -> {
-                // Настройка (заглушка)
-                Toast.makeText(this, "Настройки (в разработке)", Toast.LENGTH_SHORT).show()
+                // Открываем экран настроек
+                startActivity(Intent(this, SettingsActivity::class.java))
                 return true
             }
             R.id.menu_about -> {
@@ -323,6 +324,14 @@ class MainActivity : AppCompatActivity() {
                 val scrollAmount = layout.getLineTop(tvLog.lineCount) - tvLog.height
                 if (scrollAmount > 0) tvLog.scrollTo(0, scrollAmount) else tvLog.scrollTo(0, 0)
             }
+        }
+    }
+
+    private fun enforceLogSizeLimit() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val maxSize = prefs.getInt("log_size", 1000)
+        if (logEvents.size > maxSize) {
+            logEvents = logEvents.takeLast(maxSize).toMutableList()
         }
     }
 }
