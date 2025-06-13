@@ -185,7 +185,7 @@ class MainActivity : AppCompatActivity() {
                 // О приложении (заглушка)
                 AlertDialog.Builder(this)
                     .setTitle("О приложении")
-                    .setMessage("CameraMonitor\nВерсия 1.0\n\nМониторинг использования камеры.")
+                    .setMessage("CameraMonitor\nВерсия 0.1.0\n\nМониторинг использования камеры.")
                     .setPositiveButton("OK", null)
                     .show()
                 return true
