@@ -53,8 +53,17 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         btnClearLog.setOnClickListener {
-            prefs.edit().remove("log_events").apply()
-            Toast.makeText(this, getString(R.string.log_cleared), Toast.LENGTH_SHORT).show()
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Очистить лог?")
+                .setMessage("Вы уверены, что хотите полностью удалить все события лога?")
+                .setPositiveButton("Да") { _, _ ->
+                    prefs.edit().remove("log_events").apply()
+                    setResult(RESULT_OK)
+                    Toast.makeText(this, getString(R.string.log_cleared), Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+                .setNegativeButton("Нет", null)
+                .show()
         }
     }
 }

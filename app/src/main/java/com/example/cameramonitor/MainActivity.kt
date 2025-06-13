@@ -81,6 +81,8 @@ class MainActivity : AppCompatActivity() {
 
     private var logEvents: MutableList<LogEvent> = mutableListOf()
 
+    private val SETTINGS_REQUEST_CODE = 1002
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -127,6 +129,15 @@ class MainActivity : AppCompatActivity() {
 
         // 3) Регистрируем BroadcastReceiver для получения обновлений о камере
         registerReceiver(cameraReceiver, CameraBroadcastReceiver.intentFilter())
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == SETTINGS_REQUEST_CODE && resultCode == RESULT_OK) {
+            logEvents.clear()
+            renderLog()
+            saveLogEventsToPrefs()
+        }
     }
 
     override fun onDestroy() {
@@ -179,7 +190,7 @@ class MainActivity : AppCompatActivity() {
             }
             R.id.menu_settings -> {
                 // Открываем экран настроек
-                startActivity(Intent(this, SettingsActivity::class.java))
+                startActivityForResult(Intent(this, SettingsActivity::class.java), SETTINGS_REQUEST_CODE)
                 return true
             }
             R.id.menu_about -> {
