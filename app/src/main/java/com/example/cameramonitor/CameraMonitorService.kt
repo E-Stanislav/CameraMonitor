@@ -206,37 +206,115 @@ class CameraMonitorService : Service() {
         }
     }
 
+    private data class CameraState(
+        var inUse: Boolean = false,
+        var packageName: String? = null
+    )
+    private val cameraStates = mutableMapOf<String, CameraState>()
+    private var lastActiveCameraId: String? = null
+
+    private fun logCameraEvent(cameraId: String, inUse: Boolean, packageName: String?) {
+        val cameraName = when (cameraId) {
+            "0" -> "Back"
+            "1" -> "Front"
+            else -> "Камера ID: $cameraId"
+        }
+        val isCameraInUse = inUse
+        val currentPackageUsingCamera = packageName
+        val packageInfo = if (isCameraInUse && !currentPackageUsingCamera.isNullOrEmpty() && currentPackageUsingCamera != "Неизвестно") {
+            try {
+                val ai = packageManager.getApplicationInfo(currentPackageUsingCamera, 0)
+                PackageInfo(
+                    appName = packageManager.getApplicationLabel(ai).toString(),
+                    packageName = currentPackageUsingCamera,
+                    sourceDir = ai.sourceDir
+                )
+            } catch (e: SecurityException) {
+                PackageInfo(
+                    appName = "Защищённое приложение",
+                    packageName = currentPackageUsingCamera,
+                    sourceDir = "protected"
+                )
+            } catch (e: Exception) {
+                PackageInfo(
+                    appName = "Неопределённое приложение",
+                    packageName = currentPackageUsingCamera,
+                    sourceDir = "unknown"
+                )
+            }
+        } else {
+            PackageInfo(
+                appName = if (isCameraInUse) "Неизвестное приложение" else "Не используется",
+                packageName = if (isCameraInUse) "<unknown>" else "—",
+                sourceDir = "not_in_use"
+            )
+        }
+        val statusText = if (isCameraInUse) "Камера занята" else "Камера свободна"
+        val notif = NotificationHelper.buildNotification(
+            this,
+            "Камера: $statusText",
+            "Приложение: ${packageInfo.appName}\n" +
+            "Package: ${packageInfo.packageName}\n" +
+            "Устройство: $cameraName"
+        )
+        NotificationHelper.notify(this, NotificationHelper.NOTIFICATION_ID, notif)
+        val intent = Intent(MainActivity.ACTION_CAMERA_STATUS_CHANGED).apply {
+            putExtra(MainActivity.EXTRA_STATUS, statusText)
+            putExtra(MainActivity.EXTRA_PACKAGE, packageInfo.packageName)
+            putExtra(MainActivity.EXTRA_CAMERA, cameraName)
+            putExtra(MainActivity.EXTRA_APP_NAME, packageInfo.appName)
+            putExtra(MainActivity.EXTRA_SOURCE_DIR, packageInfo.sourceDir)
+        }
+        sendBroadcast(intent)
+    }
+
     private fun onCameraStatusChanged(cameraId: String, inUse: Boolean) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastStatusChangeTime < 1000) return // Игнорируем повторные вызовы в течение 1 секунды
-        lastStatusChangeTime = currentTime
-
-        if (isCameraInUse == inUse && currentCameraId == cameraId) return
-
-        isCameraInUse = inUse
-        currentCameraId = cameraId
+        val prevState = cameraStates[cameraId]?.inUse ?: false
+        val prevPackage = cameraStates[cameraId]?.packageName
+        val wasActiveCamera = lastActiveCameraId
+        var didLog = false
 
         if (inUse) {
-            // Приоритет: lastOpPackage -> foreground app -> "Неизвестно"
+            // Если другая камера была занята, сначала логируем её освобождение
+            if (wasActiveCamera != null && wasActiveCamera != cameraId) {
+                val prevCamState = cameraStates[wasActiveCamera]
+                if (prevCamState != null && prevCamState.inUse) {
+                    logCameraEvent(wasActiveCamera, false, prevCamState.packageName)
+                    cameraStates[wasActiveCamera]?.inUse = false
+                    cameraStates[wasActiveCamera]?.packageName = null
+                    didLog = true
+                }
+            }
+            // Теперь логируем захват новой камеры
             var candidate = lastOpPackage
             if (candidate.isNullOrEmpty() || candidate == packageName) {
-                // Если не удалось определить или это наш пакет — fallback на foreground app
                 candidate = getForegroundAppPackage()
             }
             currentPackageUsingCamera = candidate ?: "Неизвестно"
-            Log.d(logTag, "Camera in use by: $currentPackageUsingCamera")
+            cameraStates[cameraId] = CameraState(true, currentPackageUsingCamera)
+            lastActiveCameraId = cameraId
+            logCameraEvent(cameraId, true, currentPackageUsingCamera)
+            didLog = true
         } else {
-            // Камера освободилась — сбрасываем информацию о пакете
+            if (prevState) {
+                logCameraEvent(cameraId, false, prevPackage)
+                cameraStates[cameraId]?.inUse = false
+                cameraStates[cameraId]?.packageName = null
+                if (lastActiveCameraId == cameraId) lastActiveCameraId = null
+                didLog = true
+            }
             currentPackageUsingCamera = null
         }
-
-        updateNotificationAndBroadcast()
+        if (!didLog) updateNotificationAndBroadcast()
     }
 
     /**
      * Обновляем foreground-уведомление и шлём broadcast MainActivity, чтобы обновить UI.
      */
     private fun updateNotificationAndBroadcast() {
+        // Не отправлять лог, если камера неизвестна (например, при старте)
+        if (currentCameraId == null) return
+
         // Определяем читаемое имя камеры
         val cameraName = when (currentCameraId) {
             null -> "Камера неизвестна"
