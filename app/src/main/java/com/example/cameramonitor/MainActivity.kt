@@ -21,7 +21,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -48,32 +49,13 @@ class MainActivity : AppCompatActivity() {
     private val cameraReceiver = CameraBroadcastReceiver { camera, status, pkg ->
         Log.d("MainActivity", "Received camera event: camera=$camera, status=$status, pkg=$pkg")
         val appName = intent.getStringExtra(EXTRA_APP_NAME) ?: pkg
-        val sourceDir = intent.getStringExtra(EXTRA_SOURCE_DIR) ?: "unknown"
         val time = timeFmt.format(System.currentTimeMillis())
         val isCameraFree = status.contains("свободна", ignoreCase = true)
-        val logLine = if (isCameraFree) {
-            "[$time] Камера $camera: $status\n\n"
-        } else {
-            "[$time] Камера $camera: $status\nПриложение: $appName\n\n"
-        }
-        val spannable = android.text.SpannableStringBuilder(logLine)
-        if (!isCameraFree) {
-            val appLabel = "Приложение: "
-            val start = logLine.indexOf(appLabel) + appLabel.length
-            val end = start + appName.length
-            if (start >= appLabel.length && end <= logLine.length) {
-                spannable.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                spannable.setSpan(android.text.style.ForegroundColorSpan(android.graphics.Color.rgb(33, 150, 243)), start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                spannable.setSpan(android.text.style.RelativeSizeSpan(1.2f), start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-            }
-        }
-        runOnUiThread {
-            tvLog.append(spannable)
-            val layout = tvLog.layout ?: return@runOnUiThread
-            val diff = layout.getLineBottom(tvLog.lineCount - 1) - tvLog.height
-            if (diff > 0) tvLog.scrollTo(0, diff)
-        }
-        val appInfo = AppData(appName, pkg, -1, sourceDir)
+        val event = LogEvent(time, camera, status, appName, isCameraFree)
+        logEvents.add(event)
+        renderLog()
+        saveLogEventsToPrefs()
+        val appInfo = AppData(appName, pkg, -1, intent.getStringExtra(EXTRA_SOURCE_DIR) ?: "unknown")
         sendCameraNotification(camera, status, appInfo)
     }
 
@@ -83,6 +65,20 @@ class MainActivity : AppCompatActivity() {
         val targetSdkVersion: Int,
         val sourceDir: String
     )
+
+    private val PREFS_NAME = "camera_monitor_prefs"
+    private val LOG_EVENTS_KEY = "log_events"
+    private val gson = Gson()
+
+    data class LogEvent(
+        val time: String,
+        val camera: String,
+        val status: String,
+        val appName: String,
+        val isCameraFree: Boolean
+    )
+
+    private var logEvents: MutableList<LogEvent> = mutableListOf()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -104,17 +100,15 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
-
         // 1) Инициализируем UI
         btnStart = findViewById(R.id.btnStart)
         btnStop  = findViewById(R.id.btnStop)
         tvLog    = findViewById(R.id.tvLog)
         tvLog.movementMethod = ScrollingMovementMethod()
 
-        // Восстанавливаем лог при перевороте экрана
-        if (savedInstanceState != null) {
-            tvLog.text = savedInstanceState.getCharSequence("log_text")
-        }
+        // Восстанавливаем лог событий из JSON
+        logEvents = loadLogEventsFromPrefs()
+        renderLog()
 
         btnStart.setOnClickListener {
             startClicked()
@@ -162,7 +156,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putCharSequence("log_text", tvLog.text)
+        // Можно не сохранять tvLog.text, т.к. logEvents сериализуется
+        saveLogEventsToPrefs()
     }
 
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
@@ -287,5 +282,39 @@ class MainActivity : AppCompatActivity() {
         val statusCircle = findViewById<ImageView>(R.id.ivStatus)
         val color = if (isMonitoring) R.color.start_button_color else R.color.stop_button_color
         statusCircle.setColorFilter(ContextCompat.getColor(this, color))
+    }
+
+    private fun saveLogEventsToPrefs() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(LOG_EVENTS_KEY, gson.toJson(logEvents)).apply()
+    }
+
+    private fun loadLogEventsFromPrefs(): MutableList<LogEvent> {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val json = prefs.getString(LOG_EVENTS_KEY, null)
+        return if (json != null) {
+            val type = object : TypeToken<MutableList<LogEvent>>() {}.type
+            gson.fromJson(json, type)
+        } else mutableListOf()
+    }
+
+    private fun renderLog() {
+        val builder = android.text.SpannableStringBuilder()
+        for (event in logEvents) {
+            val logLine = if (event.isCameraFree) {
+                "[${event.time}] Камера ${event.camera}: ${event.status}\n\n"
+            } else {
+                "[${event.time}] Камера ${event.camera}: ${event.status}\nПриложение: ${event.appName}\n\n"
+            }
+            val start = builder.length + logLine.indexOf("Приложение: ") + "Приложение: ".length
+            val end = start + event.appName.length
+            builder.append(logLine)
+            if (!event.isCameraFree && start >= "Приложение: ".length && end <= builder.length) {
+                builder.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                builder.setSpan(android.text.style.ForegroundColorSpan(android.graphics.Color.rgb(33, 150, 243)), start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                builder.setSpan(android.text.style.RelativeSizeSpan(1.2f), start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        }
+        tvLog.text = builder
     }
 }
