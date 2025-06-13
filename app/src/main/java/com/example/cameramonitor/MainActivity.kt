@@ -316,5 +316,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
         tvLog.text = builder
+        // Автоскролл к концу лога
+        tvLog.post {
+            val layout = tvLog.layout
+            if (layout != null) {
+                val scrollAmount = layout.getLineTop(tvLog.lineCount) - tvLog.height
+                if (scrollAmount > 0) tvLog.scrollTo(0, scrollAmount) else tvLog.scrollTo(0, 0)
+            }
+        }
     }
 }
